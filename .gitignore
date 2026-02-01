@@ -1,3 +1,4 @@
-target/
-fixtures/
 .local/
+Claude.md
+fixtures/
+target/

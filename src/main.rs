@@ -3,11 +3,10 @@ use std::fs;
 use std::process;
 use std::error::Error;
 // lib.rs
-use duansheli::search;
+use duansheli::list_dir_with_meta;
 
 struct Config {
     filepath: String,
-    log_level: String,
 }
 
 impl Config {
@@ -19,12 +18,12 @@ impl Config {
             None => return Err("Missing filepath"),
         };
         
-        let log_level = match args.next() {
-            Some(arg) => arg,
-            None => return Err("Missing log level")
-        };
+        // let log_level = match args.next() {
+        //     Some(arg) => arg,
+        //     None => return Err("Missing log level")
+        // };
 
-        Ok(Config { filepath, log_level })
+        Ok(Config { filepath })
     }
 }
 
@@ -41,8 +40,14 @@ fn main() {
 }
 
 fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let cfg_raw = fs::read_to_string(config.filepath)?;
-    println!("Config: {cfg_raw}");
-    
-    Ok(())
-}
+    let cfg_raw = fs::read_to_string(&config.filepath)?;
+    println!("Config Filepath: {fp} \n", fp = &config.filepath);
+    println!("Config: {cfg_raw} \n");
+    // TODO: CONT filepath still hardcoded. Load from config
+    let target_path = "./fixtures/";
+    list_dir_with_meta(&target_path).unwrap_or_else(|err| {
+        eprintln!("Application error: {err}");
+        process::exit(1);
+    });
+
+    Ok(()) }
