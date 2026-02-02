@@ -4,6 +4,7 @@ use std::process;
 use std::error::Error;
 // lib.rs
 use duansheli::list_dir_with_meta;
+use toml::Table;
 
 struct Config {
     filepath: String,
@@ -42,8 +43,24 @@ fn main() {
 fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let cfg_raw = fs::read_to_string(&config.filepath)?;
     println!("Config Filepath: {fp} \n", fp = &config.filepath);
-    println!("Config: {cfg_raw} \n");
-    // TODO: CONT filepath still hardcoded. Load from config
+    // println!("Config: {cfg_raw}");
+
+    let toml_table: Table = cfg_raw.parse().unwrap();
+    // println!("{:?}", toml_table);
+    let value = &toml_table["dirs"];
+
+    let dir_configs = match value.as_array() {
+        Some(arr) if !arr.is_empty() => arr,
+        _ => {
+            eprintln!("Not an array, or empty");
+            process::exit(1);
+        }
+    };
+    //
+    // TODO: parse each array entry to class via #[derive(Deserialize)]: https://docs.rs/toml/latest/toml/
+
+    println!("{:?}", dir_configs);
+
     let target_path = "./fixtures/";
     list_dir_with_meta(&target_path).unwrap_or_else(|err| {
         eprintln!("Application error: {err}");

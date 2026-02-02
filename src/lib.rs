@@ -8,7 +8,7 @@ pub fn list_dir_with_meta(dir: &str) -> Result<(), Box<dyn Error>> {
     
     let dir = Path::new(dir);
     if !dir.is_dir() {
-        // TODO: useing anyhow crate: return Err(anyhow!("Directory does not exist")); 
+        // TODO: using anyhow crate: return Err(anyhow!("Directory does not exist")); 
         let err = Err("Directory does not exist".into());
         return err;
     }
