@@ -1,6 +1,6 @@
 # Run the application with default config
 run:
-    cargo run -- ~/.duansheli/config.toml info
+    cargo run -- ~/.duansheli/config.toml
 
 # Build the project
 build:

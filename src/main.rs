@@ -5,6 +5,7 @@ use std::error::Error;
 // lib.rs
 use duansheli::list_dir_with_meta;
 use toml::Table;
+use serde::Deserialize;
 
 struct Config {
     filepath: String,
@@ -40,27 +41,24 @@ fn main() {
     }
 }
 
+#[derive(Deserialize)]
+struct ConfigFile {
+    dirs: Vec<DirConfig>
+}
+#[derive(Deserialize, Debug)]
+struct DirConfig {
+    path: String,
+    time_to_archive_hours: i32,
+    time_to_delete_from_archive_hours: i32
+}
+
 fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let cfg_raw = fs::read_to_string(&config.filepath)?;
     println!("Config Filepath: {fp} \n", fp = &config.filepath);
-    // println!("Config: {cfg_raw}");
+    let config_file: ConfigFile = toml::from_str(&cfg_raw)?;
 
-    let toml_table: Table = cfg_raw.parse().unwrap();
-    // println!("{:?}", toml_table);
-    let value = &toml_table["dirs"];
-
-    let dir_configs = match value.as_array() {
-        Some(arr) if !arr.is_empty() => arr,
-        _ => {
-            eprintln!("Not an array, or empty");
-            process::exit(1);
-        }
-    };
-    //
-    // TODO: parse each array entry to class via #[derive(Deserialize)]: https://docs.rs/toml/latest/toml/
-
-    println!("{:?}", dir_configs);
-
+    println!("{:?}", config_file.dirs[0]);
+    
     let target_path = "./fixtures/";
     list_dir_with_meta(&target_path).unwrap_or_else(|err| {
         eprintln!("Application error: {err}");
