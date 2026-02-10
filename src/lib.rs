@@ -3,30 +3,66 @@ use std::error::Error;
 use std::time::SystemTime;
 use std::fs::remove_file;
 
+// struct 
 
-pub fn list_dir_with_meta(dir: &str) -> Result<(), Box<dyn Error>> {
+pub fn declutter_directory(dir: &str, cfg: DirConfig) -> Result<(), Box<dyn Error>> {
+   // iter dir
+   // for item in dir:
+   // archive?
+   
+   // iter archive
+   // for item in archive:
+   // delete?
+   unimplemented!(); 
+}
+
+pub struct DirEntryWithAge {
+    path: String,
+    seconds_since_modification: u64
+}
+
+pub fn list_dir_with_meta(dir: &str) -> Result<Vec<DirEntryWithAge>, Box<dyn Error>> {
     
     let dir = Path::new(dir);
+
     if !dir.is_dir() {
-        // TODO: using anyhow crate: return Err(anyhow!("Directory does not exist")); 
         let err = Err("Directory does not exist".into());
         return err;
     }
-    for entry in dir.read_dir().unwrap() {
-        let entry = entry?;
-        let metadata = entry.metadata()?;
-        let time_since_modified_seconds = SystemTime::now().duration_since(metadata.modified()?).unwrap().as_secs();
-        println!("File: {:?}, Metadata: {:?}, \n", entry.path(), metadata);
-        println!("File: {:?}, Duration since modified: {:?}, \n", entry.path(), time_since_modified_seconds);
-        
-        if time_since_modified_seconds > 24*60*60 {
-            remove_file(&entry.path())?;
-        }
-    }
     
-    Ok(())
+    let entries: Vec<DirEntryWithAge> = dir.read_dir()?
+        .filter_map(|entry_result| {
+
+            let entry = entry_result
+                .inspect_err(| e | eprintln!("Error reading entry: {}", e))
+                .ok()?;
+            
+            let meta = entry.metadata()
+                .inspect_err(| e | eprintln!("Error reading metadata: {}", e))
+                .ok()?;
+            
+            let modified = meta.modified()
+                .inspect_err(|e| eprintln!("Error getting modification date: {}", e))
+                .ok()?;
+            
+            let seconds_since_modification = SystemTime::now().duration_since(modified)
+                .inspect_err(|e| eprintln!("Error getting time since modification: {}", e))
+                .ok()?.as_secs();
+
+            Some(DirEntryWithAge{
+                path: entry.path().to_string_lossy().into_owned(),
+                seconds_since_modification
+            })
+
+    }).collect();
+
+    Ok(entries)
 }
 
 pub fn move_to_archive() {
     unimplemented!();
+}
+
+pub fn delete_file() {
+   unimplemented!(); 
 }

@@ -4,7 +4,6 @@ use std::process;
 use std::error::Error;
 // lib.rs
 use duansheli::list_dir_with_meta;
-use toml::Table;
 use serde::Deserialize;
 
 struct Config {
