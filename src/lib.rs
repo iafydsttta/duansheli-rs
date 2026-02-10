@@ -13,10 +13,13 @@ pub struct DirConfig {
 
 pub fn declutter_directory(dir: &str, cfg: DirConfig) -> Result<(), Box<dyn Error>> {
 
-    // TODO: move dir into DirConfig
-    // test
+    // TODO: move `dir` into DirConfig
     for entry in list_dir_with_meta(dir)? {
         println!("{}, {}", &entry.path, &entry.seconds_since_modification);
+        if entry.seconds_since_modification > (cfg.time_to_archive_hours * 3600).try_into().unwrap() {
+            println!("TTA: {}", cfg.time_to_archive_hours);
+            println!("Old entry detected.");
+        }
     }
 
    // iter dir
