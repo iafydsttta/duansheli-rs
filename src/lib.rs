@@ -1,44 +1,51 @@
-use std::path::Path;
-use std::error::Error;
-use std::time::SystemTime;
-use std::fs::remove_file;
 use serde::Deserialize;
+use std::error::Error;
+use std::fs::{create_dir_all, remove_file, rename};
+use std::path::Path;
+use std::time::SystemTime;
 
 #[derive(Deserialize, Debug)]
 pub struct DirConfig {
     pub path: String,
     pub time_to_archive_hours: i32,
-    pub time_to_delete_from_archive_hours: i32
+    pub time_to_delete_from_archive_hours: i32,
 }
 
-pub fn declutter_directory(dir: &str, cfg: DirConfig) -> Result<(), Box<dyn Error>> {
+pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
+    // ensure archive exists
+    let archive_name = ".duansheli-archive";
+    create_dir_all(Path::new(&cfg.path).join(archive_name))?;
 
-    // TODO: move `dir` into DirConfig
-    for entry in list_dir_with_meta(dir)? {
+    // clean up dir
+    for entry in list_dir_with_meta(&cfg.path, archive_name)? {
         println!("{}, {}", &entry.path, &entry.seconds_since_modification);
-        if entry.seconds_since_modification > (cfg.time_to_archive_hours * 3600).try_into().unwrap() {
-            println!("TTA: {}", cfg.time_to_archive_hours);
-            println!("Old entry detected.");
+
+        if entry.seconds_since_modification
+            >= (cfg.time_to_archive_hours * 3600).try_into().unwrap()
+        {
+            // println!(
+            //     "Old entry detected: {}, {}",
+            //     &entry.path, entry.seconds_since_modification
+            // );
+            //
+            // move to archive
+            // rename(&entry.path, ???)
         }
     }
 
-   // iter dir
-   // for item in dir:
-   // archive?
-   
-   // iter archive
-   // for item in archive:
-   // delete?
-   Ok(())
+    // clean up corresponding archive
+    Ok(())
 }
 
 pub struct DirEntryWithAge {
     path: String,
-    seconds_since_modification: u64
+    seconds_since_modification: u64,
 }
 
-pub fn list_dir_with_meta(dir: &str) -> Result<Vec<DirEntryWithAge>, Box<dyn Error>> {
-    
+pub fn list_dir_with_meta(
+    dir: &str,
+    exclude_recursive: &str,
+) -> Result<Vec<DirEntryWithAge>, Box<dyn Error>> {
     let dir = Path::new(dir);
 
     if !dir.is_dir() {
@@ -46,30 +53,42 @@ pub fn list_dir_with_meta(dir: &str) -> Result<Vec<DirEntryWithAge>, Box<dyn Err
         return err;
     }
     
-    let entries: Vec<DirEntryWithAge> = dir.read_dir()?
-        .filter_map(|entry_result| {
+    // let raw_out: Vec<Result<std::fs::DirEntry, std::io::Error>> = dir.read_dir()?.collect();
 
+    let entries: Vec<DirEntryWithAge> = dir
+        .read_dir()?
+        .filter_map(|entry_result| {
             let entry = entry_result
-                .inspect_err(| e | eprintln!("Error reading entry: {}", e))
+                .inspect_err(|e| eprintln!("Error reading entry: {}", e))
                 .ok()?;
             
-            let meta = entry.metadata()
-                .inspect_err(| e | eprintln!("Error reading metadata: {}", e))
+            if entry.file_name() == exclude_recursive {
+                println!("Excluding: {}", exclude_recursive);
+                return None
+            }
+
+            let meta = entry
+                .metadata()
+                .inspect_err(|e| eprintln!("Error reading metadata: {}", e))
                 .ok()?;
-            
-            let modified = meta.modified()
+
+            let modified = meta
+                .modified()
                 .inspect_err(|e| eprintln!("Error getting modification date: {}", e))
                 .ok()?;
-            
-            let seconds_since_modification = SystemTime::now().duration_since(modified)
-                .inspect_err(|e| eprintln!("Error getting time since modification: {}", e))
-                .ok()?.as_secs();
 
-            Some(DirEntryWithAge{
+            let seconds_since_modification = SystemTime::now()
+                .duration_since(modified)
+                .inspect_err(|e| eprintln!("Error getting time since modification: {}", e))
+                .ok()?
+                .as_secs();
+
+            Some(DirEntryWithAge {
                 path: entry.path().to_string_lossy().into_owned(),
-                seconds_since_modification
+                seconds_since_modification,
             })
-    }).collect();
+        })
+        .collect();
 
     Ok(entries)
 }
@@ -79,5 +98,5 @@ pub fn move_to_archive() {
 }
 
 pub fn delete_file() {
-   unimplemented!(); 
+    unimplemented!();
 }

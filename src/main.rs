@@ -52,17 +52,13 @@ fn run(config: Config) -> Result<(), Box<dyn Error>> {
 
     println!("{:?}", config_file.dirs[0]);
     
-    let target_path = "./fixtures/";
+    for dir_cfg in config_file.dirs {
 
-    let test_config = DirConfig{
-        path: String::from(target_path),
-        time_to_archive_hours: 42,
-        time_to_delete_from_archive_hours: 42
-    };
+        declutter_directory(dir_cfg).unwrap_or_else(|err| {
+            eprintln!("Application error: {err}");
+            process::exit(1);
+        });
+    }
 
-    declutter_directory(&target_path, test_config).unwrap_or_else(|err| {
-        eprintln!("Application error: {err}");
-        process::exit(1);
-    });
 
     Ok(()) }
