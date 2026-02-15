@@ -1,3 +1,4 @@
+use chrono::Utc;
 use serde::Deserialize;
 use std::error::Error;
 use std::fs::{create_dir_all, remove_file, rename};
@@ -23,13 +24,23 @@ pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
         if entry.seconds_since_modification
             >= (cfg.time_to_archive_hours * 3600).try_into().unwrap()
         {
-            // println!(
-            //     "Old entry detected: {}, {}",
-            //     &entry.path, entry.seconds_since_modification
-            // );
-            //
+            println!(
+                "Old entry detected: {}, {}",
+                &entry.path, entry.seconds_since_modification
+            );
+
             // move to archive
-            // rename(&entry.path, ???)
+            let source = Path::new(&entry.path);
+            let filename = source
+                .file_name()
+                .ok_or("Invalid filename")?
+                .to_string_lossy();
+            let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ");
+            let new_name = format!("{}.{}.bak", filename, timestamp);
+
+            let target_path = Path::new(&cfg.path).join(archive_name).join(&new_name);
+
+            rename(source, &target_path)?;
         }
     }
 
@@ -52,7 +63,7 @@ pub fn list_dir_with_meta(
         let err = Err("Directory does not exist".into());
         return err;
     }
-    
+
     // let raw_out: Vec<Result<std::fs::DirEntry, std::io::Error>> = dir.read_dir()?.collect();
 
     let entries: Vec<DirEntryWithAge> = dir
@@ -61,10 +72,10 @@ pub fn list_dir_with_meta(
             let entry = entry_result
                 .inspect_err(|e| eprintln!("Error reading entry: {}", e))
                 .ok()?;
-            
+
             if entry.file_name() == exclude_recursive {
                 println!("Excluding: {}", exclude_recursive);
-                return None
+                return None;
             }
 
             let meta = entry
