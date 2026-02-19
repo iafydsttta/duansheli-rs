@@ -4,5 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+chrono = "0.4.43"
+filetime = "0.2.27"
 serde = {version = "1.0.228", features = ["derive"]}
+tempfile = "3.25.0"
 toml = "0.9.11"
