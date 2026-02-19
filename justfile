@@ -9,6 +9,10 @@ build:
 # Run tests
 test:
     cargo test
+    
+# Run tests (warnings muted)
+test-quiet $RUSTFLAGS="-A warnings":
+     cargo test                                                                                                                                             
 
 # Build release version
 release:
