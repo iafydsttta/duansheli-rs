@@ -49,8 +49,8 @@ pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
 }
 
 pub struct DirEntryWithAge {
-    path: String,
-    seconds_since_modification: u64,
+    pub path: String,
+    pub seconds_since_modification: u64,
 }
 
 pub fn list_dir_with_meta(
