@@ -8,11 +8,11 @@ build:
 
 # Run tests
 test:
-    cargo test
+    cargo test -- --nocapture
     
 # Run tests (warnings muted)
 test-quiet $RUSTFLAGS="-A warnings":
-     cargo test                                                                                                                                             
+     cargo test -- --nocapture
 
 # Build release version
 release:

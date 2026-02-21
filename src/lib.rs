@@ -2,14 +2,14 @@ use chrono::Utc;
 use serde::Deserialize;
 use std::error::Error;
 use std::fs::{create_dir_all, remove_file, rename};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 #[derive(Deserialize, Debug)]
 pub struct DirConfig {
-    pub path: String,
-    pub time_to_archive_hours: i32,
-    pub time_to_delete_from_archive_hours: i32,
+    pub path: PathBuf,
+    pub time_to_archive_hours: u64,
+    pub time_to_delete_from_archive_hours: u64,
 }
 
 pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
@@ -54,10 +54,9 @@ pub struct DirEntryWithAge {
 }
 
 pub fn list_dir_with_meta(
-    dir: &str,
+    dir: &Path,
     exclude_recursive: &str,
 ) -> Result<Vec<DirEntryWithAge>, Box<dyn Error>> {
-    let dir = Path::new(dir);
 
     if !dir.is_dir() {
         let err = Err("Directory does not exist".into());
