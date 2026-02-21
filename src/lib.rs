@@ -1,7 +1,7 @@
 use chrono::Utc;
 use serde::Deserialize;
 use std::error::Error;
-use std::fs::{create_dir_all, remove_file, rename};
+use std::fs::{create_dir_all, remove_dir, remove_file, rename};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -15,10 +15,11 @@ pub struct DirConfig {
 pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
     // ensure archive exists
     let archive_name = ".duansheli-archive";
-    create_dir_all(Path::new(&cfg.path).join(archive_name))?;
+    let archive_path = Path::new(&cfg.path).join(archive_name);
+    create_dir_all(&archive_path)?;
 
     // clean up dir
-    for entry in list_dir_with_meta(&cfg.path, archive_name)? {
+    for entry in list_dir_with_meta(&cfg.path, Some(archive_name))? {
         println!("{}, {}", &entry.path, &entry.seconds_since_modification);
 
         if entry.seconds_since_modification
@@ -44,26 +45,42 @@ pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // clean up corresponding archive
+    // clean up archive
+    
+    // TODO: This will not work yet as moving to archive does not affect mtime.
+    for entry in list_dir_with_meta(&archive_path, None)? {
+        println!("{}, {}", &entry.path, &entry.seconds_since_modification);
+
+        if entry.seconds_since_modification
+            >= (cfg.time_to_delete_from_archive_hours * 3600).try_into().unwrap()
+        {
+            if entry.is_dir {
+                remove_dir(entry.path)?;
+                
+            } else {
+                remove_file(entry.path)?;
+            }
+        }
+    }
+
     Ok(())
 }
 
 pub struct DirEntryWithAge {
     pub path: String,
     pub seconds_since_modification: u64,
+    pub is_dir: bool,
 }
 
 pub fn list_dir_with_meta(
     dir: &Path,
-    exclude_recursive: &str,
+    exclude_recursive: Option<&str>,
 ) -> Result<Vec<DirEntryWithAge>, Box<dyn Error>> {
 
     if !dir.is_dir() {
         let err = Err("Directory does not exist".into());
         return err;
     }
-
-    // let raw_out: Vec<Result<std::fs::DirEntry, std::io::Error>> = dir.read_dir()?.collect();
 
     let entries: Vec<DirEntryWithAge> = dir
         .read_dir()?
@@ -72,8 +89,8 @@ pub fn list_dir_with_meta(
                 .inspect_err(|e| eprintln!("Error reading entry: {}", e))
                 .ok()?;
 
-            if entry.file_name() == exclude_recursive {
-                println!("Excluding: {}", exclude_recursive);
+            if exclude_recursive.is_some_and(|x| x == entry.file_name()){
+                println!("Excluding: {:?}", entry.file_name());
                 return None;
             }
 
@@ -96,6 +113,7 @@ pub fn list_dir_with_meta(
             Some(DirEntryWithAge {
                 path: entry.path().to_string_lossy().into_owned(),
                 seconds_since_modification,
+                is_dir: meta.is_dir()
             })
         })
         .collect();
