@@ -1,7 +1,7 @@
 use chrono::Utc;
 use serde::Deserialize;
 use std::error::Error;
-use std::fs::{create_dir_all, remove_dir, remove_file, rename};
+use std::fs::{create_dir_all, remove_dir_all, remove_file, rename};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -9,7 +9,7 @@ use std::time::SystemTime;
 pub struct DirConfig {
     pub path: PathBuf,
     pub time_to_archive_hours: u64,
-    pub time_to_delete_from_archive_hours: u64,
+    pub time_to_deletion_hours: u64,
 }
 
 pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
@@ -47,15 +47,14 @@ pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
 
     // clean up archive
     
-    // TODO: This will not work yet as moving to archive does not affect mtime.
     for entry in list_dir_with_meta(&archive_path, None)? {
         println!("{}, {}", &entry.path, &entry.seconds_since_modification);
 
         if entry.seconds_since_modification
-            >= (cfg.time_to_delete_from_archive_hours * 3600).try_into().unwrap()
+            >= (cfg.time_to_deletion_hours * 3600).try_into().unwrap()
         {
             if entry.is_dir {
-                remove_dir(entry.path)?;
+                remove_dir_all(entry.path)?;
                 
             } else {
                 remove_file(entry.path)?;
