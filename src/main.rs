@@ -1,28 +1,22 @@
+use duansheli::{DirConfig, declutter_directory};
+use serde::Deserialize;
 use std::env;
+use std::error::Error;
 use std::fs;
 use std::process;
-use std::error::Error;
-// lib.rs
-use serde::Deserialize;
-use duansheli::{declutter_directory, DirConfig};
 
 struct Config {
     filepath: String,
 }
 
 impl Config {
-    fn build(mut args: impl Iterator<Item = String>) -> Result<Config, &'static str>{
+    fn build(mut args: impl Iterator<Item = String>) -> Result<Config, &'static str> {
         args.next();
 
         let filepath = match args.next() {
             Some(arg) => arg,
             None => return Err("Missing filepath"),
         };
-        
-        // let log_level = match args.next() {
-        //     Some(arg) => arg,
-        //     None => return Err("Missing log level")
-        // };
 
         Ok(Config { filepath })
     }
@@ -36,13 +30,13 @@ fn main() {
 
     if let Err(e) = run(config) {
         println!("Application error: {e}");
-        process::exit(1);    
+        process::exit(1);
     }
 }
 
 #[derive(Deserialize)]
 struct ConfigFile {
-    dirs: Vec<DirConfig>
+    dirs: Vec<DirConfig>,
 }
 
 fn run(config: Config) -> Result<(), Box<dyn Error>> {
@@ -51,14 +45,13 @@ fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let config_file: ConfigFile = toml::from_str(&cfg_raw)?;
 
     println!("{:?}", config_file.dirs[0]);
-    
-    for dir_cfg in config_file.dirs {
 
+    for dir_cfg in config_file.dirs {
         declutter_directory(dir_cfg).unwrap_or_else(|err| {
             eprintln!("Application error: {err}");
             process::exit(1);
         });
     }
 
-
-    Ok(()) }
+    Ok(())
+}

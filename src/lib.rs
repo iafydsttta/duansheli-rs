@@ -16,42 +16,25 @@ pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
     // ensure archive exists
     let archive_name = ".duansheli-archive";
     let archive_path = Path::new(&cfg.path).join(archive_name);
-    create_dir_all(&archive_path)?;
+    create_dir_all(&archive_path).unwrap();
 
     // clean up dir
     for entry in list_dir_with_meta(&cfg.path, Some(archive_name))? {
         println!("{}, {}", &entry.path, &entry.seconds_since_modification);
 
         if entry.seconds_since_modification
-            >= (cfg.time_to_archive_hours * 3600).try_into().unwrap()
+            >= (cfg.time_to_archive_hours * 3600)
         {
-            println!(
-                "Old entry detected: {}, {}",
-                &entry.path, entry.seconds_since_modification
-            );
-
-            // move to archive
-            let source = Path::new(&entry.path);
-            let filename = source
-                .file_name()
-                .ok_or("Invalid filename")?
-                .to_string_lossy();
-            let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ");
-            let new_name = format!("{}.{}.bak", filename, timestamp);
-
-            let target_path = Path::new(&cfg.path).join(archive_name).join(&new_name);
-
-            rename(source, &target_path)?;
+            move_to_archive_all(&archive_path, entry)?;
         }
     }
 
     // clean up archive
-    
     for entry in list_dir_with_meta(&archive_path, None)? {
         println!("{}, {}", &entry.path, &entry.seconds_since_modification);
 
         if entry.seconds_since_modification
-            >= (cfg.time_to_deletion_hours * 3600).try_into().unwrap()
+            >= (cfg.time_to_deletion_hours * 3600)
         {
             if entry.is_dir {
                 remove_dir_all(entry.path)?;
@@ -62,6 +45,23 @@ pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
         }
     }
 
+    Ok(())
+}
+
+fn move_to_archive_all(archive_path: &Path, entry: DirEntryWithAge) -> Result<(), Box<dyn Error + 'static>> {
+    println!(
+        "Old entry detected: {}, {}",
+        &entry.path, entry.seconds_since_modification
+    );
+    let source = Path::new(&entry.path);
+    let filename = source
+        .file_name()
+        .ok_or("Invalid filename")?
+        .to_string_lossy();
+    let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ");
+    let new_name = format!("{}.{}.bak", filename, timestamp);
+    let target_path = Path::new(archive_path).join(&new_name);
+    rename(source, &target_path)?;
     Ok(())
 }
 
@@ -118,10 +118,6 @@ pub fn list_dir_with_meta(
         .collect();
 
     Ok(entries)
-}
-
-pub fn move_to_archive() {
-    unimplemented!();
 }
 
 pub fn delete_file() {
