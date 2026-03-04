@@ -12,34 +12,37 @@ pub struct DirConfig {
     pub time_to_deletion_hours: u64,
 }
 
-pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
-    // ensure archive exists
+pub fn declutter_directory(cfg: DirConfig, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let archive_name = ".duansheli-archive";
     let archive_path = Path::new(&cfg.path).join(archive_name);
+
     create_dir_all(&archive_path).unwrap();
 
-    // clean up dir
+    // archival
     for entry in list_dir_with_meta(&cfg.path, Some(archive_name))? {
-        println!("{}, {}", &entry.path, &entry.seconds_since_modification);
+        log::debug!("{}, {}", &entry.path, &entry.seconds_since_modification);
 
-        if entry.seconds_since_modification
-            >= (cfg.time_to_archive_hours * 3600)
-        {
-            move_to_archive_all(&archive_path, entry)?;
+        if entry.seconds_since_modification >= (cfg.time_to_archive_hours * 3600) {
+            if dry_run {
+                log::info!("[dry-run] Would archive: {}", entry.path);
+            } else {
+                move_to_archive_all(&archive_path, entry)?;
+            }
         }
     }
 
     // clean up archive
     for entry in list_dir_with_meta(&archive_path, None)? {
-        println!("{}, {}", &entry.path, &entry.seconds_since_modification);
+        log::debug!("{}, {}", &entry.path, &entry.seconds_since_modification);
 
-        if entry.seconds_since_modification
-            >= (cfg.time_to_deletion_hours * 3600)
-        {
-            if entry.is_dir {
+        if entry.seconds_since_modification >= (cfg.time_to_deletion_hours * 3600) {
+            if dry_run {
+                log::info!("[dry-run] Would delete: {}", entry.path);
+            } else if entry.is_dir {
+                log::info!("Removing dir {} and all its contents", entry.path);
                 remove_dir_all(entry.path)?;
-                
             } else {
+                log::info!("Removing file {}", entry.path);
                 remove_file(entry.path)?;
             }
         }
@@ -48,10 +51,11 @@ pub fn declutter_directory(cfg: DirConfig) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn move_to_archive_all(archive_path: &Path, entry: DirEntryWithAge) -> Result<(), Box<dyn Error + 'static>> {
-    println!(
+fn move_to_archive_all(archive_path: &Path, entry: DirEntryWithAge) -> Result<(), Box<dyn Error>> {
+    log::info!(
         "Old entry detected: {}, {}",
-        &entry.path, entry.seconds_since_modification
+        &entry.path,
+        entry.seconds_since_modification
     );
     let source = Path::new(&entry.path);
     let filename = source
@@ -75,7 +79,6 @@ pub fn list_dir_with_meta(
     dir: &Path,
     exclude_recursive: Option<&str>,
 ) -> Result<Vec<DirEntryWithAge>, Box<dyn Error>> {
-
     if !dir.is_dir() {
         let err = Err("Directory does not exist".into());
         return err;
@@ -85,34 +88,34 @@ pub fn list_dir_with_meta(
         .read_dir()?
         .filter_map(|entry_result| {
             let entry = entry_result
-                .inspect_err(|e| eprintln!("Error reading entry: {}", e))
+                .inspect_err(|e| log::warn!("Error reading entry: {}", e))
                 .ok()?;
 
-            if exclude_recursive.is_some_and(|x| x == entry.file_name()){
-                println!("Excluding: {:?}", entry.file_name());
+            if exclude_recursive.is_some_and(|x| x == entry.file_name()) {
+                log::debug!("Excluding: {:?}", entry.path());
                 return None;
             }
 
             let meta = entry
                 .metadata()
-                .inspect_err(|e| eprintln!("Error reading metadata: {}", e))
+                .inspect_err(|e| log::warn!("Error reading metadata: {}", e))
                 .ok()?;
 
             let modified = meta
                 .modified()
-                .inspect_err(|e| eprintln!("Error getting modification date: {}", e))
+                .inspect_err(|e| log::warn!("Error getting modification date: {}", e))
                 .ok()?;
 
             let seconds_since_modification = SystemTime::now()
                 .duration_since(modified)
-                .inspect_err(|e| eprintln!("Error getting time since modification: {}", e))
+                .inspect_err(|e| log::warn!("Error getting time since modification: {}", e))
                 .ok()?
                 .as_secs();
 
             Some(DirEntryWithAge {
                 path: entry.path().to_string_lossy().into_owned(),
                 seconds_since_modification,
-                is_dir: meta.is_dir()
+                is_dir: meta.is_dir(),
             })
         })
         .collect();

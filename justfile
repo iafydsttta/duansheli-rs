@@ -1,5 +1,5 @@
 # Run the application with default config
-run:
+run $RUST_LOG="debug":
     cargo run -- ~/.duansheli/config.toml
 
 # Build the project
