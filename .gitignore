@@ -3,4 +3,4 @@ Claude.md
 fixtures/
 target/
 specs/
-settings.json
+.vscode/
