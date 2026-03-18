@@ -183,6 +183,64 @@ fn test_permanent_deletion_dry_run() {
     assert!(root.join("D_YOUNG").exists(), "young dir should still exist");
 }
 
+#[test]
+fn test_declutter_rejects_dangerous_path() {
+    let cfg = DirConfig {
+        path: std::path::PathBuf::from("/"),
+        time_to_archive_hours: 1,
+        time_to_deletion_hours: 2,
+    };
+    let result = declutter_directory(cfg, true);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("dangerous path"), "expected dangerous path error, got: {}", err_msg);
+}
+
+#[test]
+fn test_ignored_files_survive_declutter() {
+    let time_to_archive_hours: u64 = 1;
+    let time_to_deletion_hours: u64 = 2;
+    let exceeds_deletion_secs = (time_to_deletion_hours * 3600) + 1;
+
+    let tmp_dir = TempDir::new().unwrap();
+    let root = tmp_dir.path();
+
+    // Create metadata files with old mtimes
+    create_file_fixture(root, ".DS_Store", exceeds_deletion_secs);
+    create_file_fixture(root, "Thumbs.db", exceeds_deletion_secs);
+    // Also create a normal old file to confirm it does get processed
+    create_file_fixture(root, "old_file.txt", exceeds_deletion_secs);
+
+    let cfg = DirConfig {
+        path: root.to_path_buf(),
+        time_to_archive_hours,
+        time_to_deletion_hours,
+    };
+
+    declutter_directory(cfg, false).unwrap();
+
+    // Metadata files should survive
+    assert!(root.join(".DS_Store").exists(), ".DS_Store should be ignored and survive");
+    assert!(root.join("Thumbs.db").exists(), "Thumbs.db should be ignored and survive");
+
+    // Normal old file should be gone (deleted, since it exceeds deletion threshold)
+    assert!(!root.join("old_file.txt").exists(), "old_file.txt should have been deleted");
+
+    // Metadata files should NOT be in the archive
+    let archive = root.join(".duansheli-archive");
+    if archive.exists() {
+        let archived: Vec<_> = fs::read_dir(&archive)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        for entry in &archived {
+            let name = entry.file_name().to_string_lossy().to_string();
+            assert!(!name.starts_with(".DS_Store"), ".DS_Store should not be in archive");
+            assert!(!name.starts_with("Thumbs.db"), "Thumbs.db should not be in archive");
+        }
+    }
+}
+
 fn debug_print_tree_with_timestamps(root: &std::path::Path) {
     let tree_output = std::process::Command::new("tree")
         .arg("-D")

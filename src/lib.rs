@@ -1,10 +1,66 @@
 use chrono::Utc;
 use serde::Deserialize;
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fmt;
 use std::fs::{create_dir_all, remove_dir_all, remove_file, rename};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+
+const DANGEROUS_PATHS: &[&str] = &[
+    "/",
+    "/usr", "/bin", "/sbin", "/etc", "/var", "/tmp",
+    "/lib", "/opt",
+    "/System", "/Applications",
+];
+
+const ALWAYS_IGNORE: &[&str] = &[
+    ".DS_Store",
+    "Thumbs.db",
+    ".Spotlight-V100",
+    ".fseventsd",
+    "desktop.ini",
+];
+
+#[derive(Debug)]
+pub struct DangerousPathError {
+    pub path: PathBuf,
+}
+
+impl fmt::Display for DangerousPathError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "refusing to operate on dangerous path: {}", self.path.display())
+    }
+}
+
+impl std::error::Error for DangerousPathError {}
+
+pub fn validate_path_safety(path: &Path) -> Result<(), DangerousPathError> {
+    let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let candidates = [path, resolved.as_path()];
+
+    if let Some(home) = std::env::var_os("HOME") {
+        let home_path = Path::new(&home);
+        let home_resolved = std::fs::canonicalize(home_path)
+            .unwrap_or_else(|_| home_path.to_path_buf());
+        for candidate in &candidates {
+            if *candidate == home_path || *candidate == home_resolved {
+                return Err(DangerousPathError { path: resolved });
+            }
+        }
+    }
+
+    for &dangerous in DANGEROUS_PATHS {
+        let dangerous_path = Path::new(dangerous);
+        for candidate in &candidates {
+            if *candidate == dangerous_path {
+                return Err(DangerousPathError { path: resolved });
+            }
+        }
+    }
+
+    Ok(())
+}
 
 #[derive(Deserialize, Debug)]
 pub struct DirConfig {
@@ -135,6 +191,8 @@ pub fn execute_actions(actions: &[FileAction]) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn declutter_directory(cfg: DirConfig, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    validate_path_safety(&cfg.path)?;
+
     let archive_path = cfg.path.join(".duansheli-archive");
     create_dir_all(&archive_path)?;
 
@@ -169,6 +227,11 @@ pub fn list_dir_with_meta(
 
             if exclude_recursive.is_some_and(|x| x == entry.file_name()) {
                 log::debug!("Excluding: {:?}", entry.path());
+                return None;
+            }
+
+            if ALWAYS_IGNORE.iter().any(|&ignored| OsStr::new(ignored) == entry.file_name()) {
+                log::debug!("Ignoring metadata file: {:?}", entry.path());
                 return None;
             }
 
@@ -292,6 +355,29 @@ mod tests {
 
         let actions = plan_delete_actions(entries, cutoff);
         assert!(actions.is_empty());
+    }
+
+    #[test]
+    fn test_validate_path_safety_rejects_root() {
+        assert!(validate_path_safety(Path::new("/")).is_err());
+    }
+
+    #[test]
+    fn test_validate_path_safety_rejects_home() {
+        let home = std::env::var("HOME").unwrap();
+        assert!(validate_path_safety(Path::new(&home)).is_err());
+    }
+
+    #[test]
+    fn test_validate_path_safety_rejects_system_dirs() {
+        assert!(validate_path_safety(Path::new("/usr")).is_err());
+        assert!(validate_path_safety(Path::new("/etc")).is_err());
+    }
+
+    #[test]
+    fn test_validate_path_safety_accepts_normal_path() {
+        let tmp = std::env::temp_dir().join("duansheli-test-safe");
+        assert!(validate_path_safety(&tmp).is_ok());
     }
 
     #[test]
