@@ -3,6 +3,7 @@ use serde::Deserialize;
 use std::env;
 use std::error::Error;
 use std::fs;
+use std::path::PathBuf;
 use std::process;
 
 struct CliArgs {
@@ -10,8 +11,18 @@ struct CliArgs {
     dry_run: bool,
 }
 
+fn default_config_path() -> PathBuf {
+    let config_home = env::var("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = env::var("HOME").expect("HOME environment variable not set");
+            PathBuf::from(home).join(".config")
+        });
+    config_home.join("duansheli").join("config.toml")
+}
+
 impl CliArgs {
-    fn build(mut args: impl Iterator<Item = String>) -> Result<CliArgs, &'static str> {
+    fn build(mut args: impl Iterator<Item = String>) -> CliArgs {
         args.next(); // skip binary name
 
         let mut filepath = None;
@@ -24,18 +35,16 @@ impl CliArgs {
             }
         }
 
-        let filepath = filepath.ok_or("Missing filepath")?;
-        Ok(CliArgs { filepath, dry_run })
+        let filepath = filepath
+            .unwrap_or_else(|| default_config_path().to_string_lossy().into_owned());
+        CliArgs { filepath, dry_run }
     }
 }
 
 fn main() {
     env_logger::init();
 
-    let config_file = CliArgs::build(env::args()).unwrap_or_else(|err| {
-        log::error!("Problem parsing arguments: {err}");
-        process::exit(1);
-    });
+    let config_file = CliArgs::build(env::args());
 
     if let Err(e) = run(config_file) {
         log::error!("Application error: {e}");
@@ -56,6 +65,7 @@ fn run(cli: CliArgs) -> Result<(), Box<dyn Error>> {
     log::debug!("{:?}", config.dirs[0]);
 
     for dir_config in config.dirs {
+        log::info!("Processing directory: {}", dir_config.path.display());
         declutter_directory(dir_config, cli.dry_run).unwrap_or_else(|err| {
             log::error!("Application error: {err}");
             process::exit(1);
