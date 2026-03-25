@@ -1,16 +1,39 @@
+use clap::{Parser, Subcommand};
 use duansheli::{DirConfig, declutter_directory};
 use serde::Deserialize;
-use core::fmt;
 use std::env;
 use std::error::Error;
+use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
 
-struct CliArgs {
-    filepath: String,
-    dry_run: bool,
-    print: bool
+/// duansheli - directory declutter & archival tool
+#[derive(Parser, Debug)]
+#[command(name = "duansheli", version, about)]
+struct Cli {
+    /// Config file path [default: $XDG_CONFIG_HOME/duansheli/config.toml]
+    #[arg(short, long, global = true)]
+    config: Option<PathBuf>,
+
+    /// Increase log verbosity (-v info, -vv debug, -vvv trace)
+    #[arg(short, long, action = clap::ArgAction::Count, global = true)]
+    verbose: u8,
+    
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Process directories: archive old files, delete ancient ones
+    Run {
+        /// Simulate actions without making changes
+        #[arg(short = 'n', long)]
+        dry_run: bool,
+    },
+    /// Display the current configuration
+    Print,
 }
 
 fn default_config_path() -> PathBuf {
@@ -23,45 +46,35 @@ fn default_config_path() -> PathBuf {
     config_home.join("duansheli").join("config.toml")
 }
 
-impl CliArgs {
-    fn build(mut args: impl Iterator<Item = String>) -> CliArgs {
-        args.next(); // skip binary name
-
-        let mut filepath = None;
-        let mut dry_run = false;
-        let mut print = false;
-
-        for arg in args {
-            match arg.as_str() {
-                "-n" | "--dry-run" => dry_run = true,
-                "-p" | "--print" => print = true,
-                _ => filepath = Some(arg),
-            }
-        }
-
-        let filepath = filepath
-            .unwrap_or_else(|| default_config_path().to_string_lossy().into_owned());
-        CliArgs { filepath, dry_run, print }
-    }
-    
-}
-
-impl fmt::Display for CliArgs {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "duansheli configuration")?;
-        writeln!(f, "  config file : {}", self.filepath)?;
-        write!(f, "  dry run     : {}", self.dry_run)
+fn init_logging(verbose: u8) {
+    if env::var("RUST_LOG").is_ok() {
+        env_logger::init();
+    } else {
+        let level = match verbose {
+            0 => log::LevelFilter::Warn,
+            1 => log::LevelFilter::Info,
+            2 => log::LevelFilter::Debug,
+            _ => log::LevelFilter::Trace,
+        };
+        env_logger::Builder::new().filter_level(level).init();
     }
 }
 
 fn main() {
-    env_logger::init();
+    let cli = Cli::parse();
+    init_logging(cli.verbose);
 
-    let config_file = CliArgs::build(env::args());
-    
-    if let Err(e) = run(config_file) {
-        log::error!("Application error: {e}");
-    process::exit(1);
+    let config_path = cli.config.unwrap_or_else(default_config_path);
+
+    let result = match cli.command {
+        Some(Command::Run { dry_run }) => run_declutter(&config_path, dry_run),
+        None => run_declutter(&config_path, false),
+        Some(Command::Print) => print_config(&config_path),
+    };
+
+    if let Err(e) = result {
+        log::error!("{e}");
+        process::exit(1);
     }
 }
 
@@ -82,29 +95,27 @@ impl fmt::Display for DuansheliConfig {
     }
 }
 
-fn run(cli: CliArgs) -> Result<(), Box<dyn Error>> {
-    if cli.print {
-        println!("{cli}");
-        match fs::read_to_string(&cli.filepath) {
-            Ok(raw) => {
-                let config: DuansheliConfig = toml::from_str(&raw)?;
-                println!("{config}");
-            }
-            Err(e) => println!("  config      : not found ({e})"),
+fn print_config(config_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+    println!("duansheli configuration");
+    println!("  config file : {}", config_path.display());
+    match fs::read_to_string(config_path) {
+        Ok(raw) => {
+            let config: DuansheliConfig = toml::from_str(&raw)?;
+            println!("{config}");
         }
-        process::exit(0);
+        Err(e) => println!("  config      : not found ({e})"),
     }
+    Ok(())
+}
 
-    let config_raw = fs::read_to_string(&cli.filepath)?;
-    log::info!("Config Filepath: {fp}", fp = &cli.filepath);
+fn run_declutter(config_path: &PathBuf, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    let config_raw = fs::read_to_string(config_path)?;
+    log::info!("Config Filepath: {}", config_path.display());
     let config: DuansheliConfig = toml::from_str(&config_raw)?;
 
     for dir_config in config.dirs {
         log::info!("Processing directory: {}", dir_config.path.display());
-        declutter_directory(dir_config, cli.dry_run).unwrap_or_else(|err| {
-            log::error!("Application error: {err}");
-            process::exit(1);
-        });
+        declutter_directory(dir_config, dry_run)?;
     }
 
     Ok(())

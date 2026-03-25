@@ -200,7 +200,7 @@ pub fn declutter_directory(cfg: DirConfig, dry_run: bool) -> Result<(), Box<dyn 
 
     if dry_run {
         for action in &actions {
-            log::info!("[dry-run] {}", action);
+            println!("[dry-run] {}", action);
         }
     } else {
         execute_actions(&actions)?;
