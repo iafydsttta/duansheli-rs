@@ -300,3 +300,62 @@ fn test_permanent_deletion() {
     assert!(remaining.iter().any(|e| e.file_name().to_string_lossy().starts_with("f_medium.txt.")));
     assert!(remaining.iter().any(|e| e.file_name().to_string_lossy().starts_with("D_MEDIUM.")));
 }
+
+/// Run the duansheli binary as a subprocess, pointing HOME to a temp dir so the
+/// log file is created in a predictable, isolated location.
+#[test]
+fn test_log_file_created_on_run() {
+    let tmp = TempDir::new().unwrap();
+    let fake_home = tmp.path();
+
+    // Expected log path when HOME is redirected
+    #[cfg(target_os = "macos")]
+    let expected_log = fake_home.join("Library/Logs/duansheli/duansheli.log");
+    #[cfg(target_os = "linux")]
+    let expected_log = fake_home.join(".local/state/duansheli/duansheli.log");
+    #[cfg(target_os = "windows")]
+    let expected_log = {
+        // On Windows we redirect LOCALAPPDATA instead
+        fake_home.join(r"duansheli\logs\duansheli.log")
+    };
+
+    // Build the path to our binary (in the cargo target directory)
+    let binary = env!("CARGO_BIN_EXE_duansheli");
+
+    // Run the binary — it will fail to find a config file, but logging init
+    // happens before config loading, so the log file will still be created.
+    let mut cmd = std::process::Command::new(binary);
+    cmd.env("HOME", fake_home);
+    #[cfg(target_os = "windows")]
+    cmd.env("LOCALAPPDATA", fake_home);
+    // Clear XDG_STATE_HOME so Linux uses the HOME-based fallback
+    cmd.env_remove("XDG_STATE_HOME");
+    // Clear XDG_CONFIG_HOME so it uses HOME-based default (and fails to find config)
+    cmd.env_remove("XDG_CONFIG_HOME");
+
+    let _output = cmd.output().expect("failed to run duansheli binary");
+
+    // The binary will exit with an error (no config file), but the log file
+    // should still exist with content from the logging initialization
+    assert!(expected_log.exists(), "log file should be created at {}", expected_log.display());
+
+    let log_content = fs::read_to_string(&expected_log).unwrap();
+    assert!(!log_content.is_empty(), "log file should not be empty");
+    // The error about the missing config file should be logged
+    assert!(
+        log_content.contains("ERROR") || log_content.contains("WARN") || log_content.contains("DEBUG"),
+        "log file should contain log level markers, got: {log_content}"
+    );
+}
+
+#[test]
+fn test_default_log_path_uses_home() {
+    // Verify the public default_log_path() function returns a path rooted in HOME
+    let path = default_log_path();
+    let home = std::env::var("HOME").unwrap();
+    assert!(
+        path.starts_with(&home),
+        "log path should be under HOME ({home}), got: {}",
+        path.display()
+    );
+}

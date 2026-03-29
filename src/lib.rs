@@ -1,11 +1,41 @@
 use chrono::Utc;
 use serde::Deserialize;
+use std::env;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs::{create_dir_all, remove_dir_all, remove_file, rename};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+
+/// Returns the platform-canonical path for the duansheli log file.
+///
+/// - macOS:   `~/Library/Logs/duansheli/duansheli.log`
+/// - Linux:   `$XDG_STATE_HOME/duansheli/duansheli.log` (fallback `~/.local/state/…`)
+/// - Windows: `%LOCALAPPDATA%\duansheli\logs\duansheli.log`
+pub fn default_log_path() -> PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        let home = env::var("HOME").expect("HOME environment variable not set");
+        PathBuf::from(home).join("Library/Logs/duansheli/duansheli.log")
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let state_home = env::var("XDG_STATE_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                let home = env::var("HOME").expect("HOME environment variable not set");
+                PathBuf::from(home).join(".local/state")
+            });
+        state_home.join("duansheli/duansheli.log")
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let local_app_data =
+            env::var("LOCALAPPDATA").expect("LOCALAPPDATA environment variable not set");
+        PathBuf::from(local_app_data).join(r"duansheli\logs\duansheli.log")
+    }
+}
 
 const DANGEROUS_PATHS: &[&str] = &[
     "/",
@@ -355,6 +385,23 @@ mod tests {
 
         let actions = plan_delete_actions(entries, cutoff);
         assert!(actions.is_empty());
+    }
+
+    #[test]
+    fn test_default_log_path_structure() {
+        let path = default_log_path();
+        let path_str = path.to_string_lossy();
+        assert!(path_str.contains("duansheli"), "path should contain 'duansheli': {path_str}");
+        assert!(path_str.ends_with("duansheli.log"), "path should end with 'duansheli.log': {path_str}");
+
+        #[cfg(target_os = "macos")]
+        assert!(path_str.contains("Library/Logs"), "macOS path should use Library/Logs: {path_str}");
+
+        #[cfg(target_os = "linux")]
+        assert!(
+            path_str.contains(".local/state") || env::var("XDG_STATE_HOME").is_ok(),
+            "Linux path should use .local/state or XDG_STATE_HOME: {path_str}"
+        );
     }
 
     #[test]
