@@ -39,9 +39,16 @@ pub fn default_log_path() -> PathBuf {
 
 const DANGEROUS_PATHS: &[&str] = &[
     "/",
-    "/usr", "/bin", "/sbin", "/etc", "/var", "/tmp",
-    "/lib", "/opt",
-    "/System", "/Applications",
+    "/usr",
+    "/bin",
+    "/sbin",
+    "/etc",
+    "/var",
+    "/tmp",
+    "/lib",
+    "/opt",
+    "/System",
+    "/Applications",
 ];
 
 const ALWAYS_IGNORE: &[&str] = &[
@@ -59,7 +66,11 @@ pub struct DangerousPathError {
 
 impl fmt::Display for DangerousPathError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "refusing to operate on dangerous path: {}", self.path.display())
+        write!(
+            f,
+            "refusing to operate on dangerous path: {}",
+            self.path.display()
+        )
     }
 }
 
@@ -71,8 +82,8 @@ pub fn validate_path_safety(path: &Path) -> Result<(), DangerousPathError> {
 
     if let Some(home) = std::env::var_os("HOME") {
         let home_path = Path::new(&home);
-        let home_resolved = std::fs::canonicalize(home_path)
-            .unwrap_or_else(|_| home_path.to_path_buf());
+        let home_resolved =
+            std::fs::canonicalize(home_path).unwrap_or_else(|_| home_path.to_path_buf());
         for candidate in &candidates {
             if *candidate == home_path || *candidate == home_resolved {
                 return Err(DangerousPathError { path: resolved });
@@ -140,22 +151,30 @@ fn plan_archive_actions(
         .filter(|e| e.seconds_since_modification >= cutoff_secs)
         .map(|entry| {
             let source = PathBuf::from(&entry.path);
-            let filename = source
-                .file_name()
-                .expect("entry should have a filename")
+            let file_stem = source
+                .file_stem()
+                .expect("entry should have a file_stem")
                 .to_string_lossy();
-            let new_name = format!("{}.{}.bak", filename, timestamp);
-            let target = archive_path.join(&new_name);
+
+            let new_name = format!("{}.{}.bak", file_stem, timestamp);
 
             if entry.is_dir {
+                let target = archive_path.join(&new_name);
                 FileAction::MoveDir {
                     from: source,
                     to: target,
                 }
             } else {
+                let name_with_ext = match source.extension() {
+                    Some(ext) => {
+                        format!("{}.{}.bak.{}", file_stem, timestamp, ext.to_string_lossy())
+                    }
+                    None => format!("{}.{}.bak", file_stem, timestamp),
+                };
+
                 FileAction::MoveFile {
                     from: source,
-                    to: target,
+                    to: archive_path.join(name_with_ext),
                 }
             }
         })
@@ -191,7 +210,11 @@ pub fn plan_declutter(cfg: &DirConfig) -> Result<Vec<FileAction>, Box<dyn Error>
         .partition(|e| e.seconds_since_modification >= delete_cutoff);
 
     let mut actions = plan_delete_actions(to_delete, delete_cutoff);
-    actions.extend(plan_archive_actions(&archive_path, to_archive, archive_cutoff));
+    actions.extend(plan_archive_actions(
+        &archive_path,
+        to_archive,
+        archive_cutoff,
+    ));
 
     // Delete existing archive entries that exceed deletion cutoff
     let archive_entries = list_dir_with_meta(&archive_path, None)?;
@@ -260,7 +283,10 @@ pub fn list_dir_with_meta(
                 return None;
             }
 
-            if ALWAYS_IGNORE.iter().any(|&ignored| OsStr::new(ignored) == entry.file_name()) {
+            if ALWAYS_IGNORE
+                .iter()
+                .any(|&ignored| OsStr::new(ignored) == entry.file_name())
+            {
                 log::debug!("Ignoring metadata file: {:?}", entry.path());
                 return None;
             }
@@ -321,8 +347,8 @@ mod tests {
             FileAction::MoveFile { from, to } => {
                 assert_eq!(from, &PathBuf::from("/tmp/root/old_file.txt"));
                 assert!(to.starts_with("/tmp/archive/"));
-                assert!(to.to_string_lossy().ends_with(".bak"));
-                assert!(to.to_string_lossy().contains("old_file.txt."));
+                assert!(to.to_string_lossy().ends_with(".bak.txt"));
+                assert!(to.to_string_lossy().contains("old_file."));
             }
             other => panic!("expected MoveFile, got {:?}", other),
         }
@@ -334,6 +360,26 @@ mod tests {
                 assert!(to.to_string_lossy().contains("old_dir."));
             }
             other => panic!("expected MoveDir, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_plan_archive_actions_file_without_extension() {
+        let archive = PathBuf::from("/tmp/archive");
+        let cutoff = 3600;
+        let entries = vec![make_entry("/tmp/root/README", 7200, false)];
+
+        let actions = plan_archive_actions(&archive, entries, cutoff);
+
+        assert_eq!(actions.len(), 1);
+        match &actions[0] {
+            FileAction::MoveFile { from, to } => {
+                assert_eq!(from, &PathBuf::from("/tmp/root/README"));
+                assert!(to.starts_with("/tmp/archive/"));
+                assert!(to.to_string_lossy().ends_with(".bak"));
+                assert!(to.to_string_lossy().contains("README."));
+            }
+            other => panic!("expected MoveFile, got {:?}", other),
         }
     }
 
@@ -391,11 +437,20 @@ mod tests {
     fn test_default_log_path_structure() {
         let path = default_log_path();
         let path_str = path.to_string_lossy();
-        assert!(path_str.contains("duansheli"), "path should contain 'duansheli': {path_str}");
-        assert!(path_str.ends_with("duansheli.log"), "path should end with 'duansheli.log': {path_str}");
+        assert!(
+            path_str.contains("duansheli"),
+            "path should contain 'duansheli': {path_str}"
+        );
+        assert!(
+            path_str.ends_with("duansheli.log"),
+            "path should end with 'duansheli.log': {path_str}"
+        );
 
         #[cfg(target_os = "macos")]
-        assert!(path_str.contains("Library/Logs"), "macOS path should use Library/Logs: {path_str}");
+        assert!(
+            path_str.contains("Library/Logs"),
+            "macOS path should use Library/Logs: {path_str}"
+        );
 
         #[cfg(target_os = "linux")]
         assert!(

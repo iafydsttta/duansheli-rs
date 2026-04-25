@@ -115,10 +115,16 @@ fn test_directory_archival() {
         .filter_map(|e| e.ok())
         .collect();
     assert_eq!(archived.len(), 5, "archive should contain 5 entries");
-    assert!(archived.iter().any(|e| e.file_name().to_string_lossy().starts_with("f_old.txt.")));
+    assert!(archived.iter().any(|e| {
+        let name = e.file_name().to_string_lossy().into_owned();
+        name.starts_with("f_old.") && name.ends_with(".bak.txt")
+    }));
     assert!(archived.iter().any(|e| e.file_name().to_string_lossy().starts_with("D_OLD.")));
     assert!(archived.iter().any(|e| e.file_name().to_string_lossy().starts_with("D_OLD_NESTING.")));
-    assert!(archived.iter().any(|e| e.file_name().to_string_lossy().starts_with("f_medium.txt.")));
+    assert!(archived.iter().any(|e| {
+        let name = e.file_name().to_string_lossy().into_owned();
+        name.starts_with("f_medium.") && name.ends_with(".bak.txt")
+    }));
     assert!(archived.iter().any(|e| e.file_name().to_string_lossy().starts_with("D_MEDIUM.")));
 }
 
@@ -297,7 +303,10 @@ fn test_permanent_deletion() {
         "only medium entries should survive in archive, but found: {:?}",
         remaining.iter().map(|e| e.file_name()).collect::<Vec<_>>()
     );
-    assert!(remaining.iter().any(|e| e.file_name().to_string_lossy().starts_with("f_medium.txt.")));
+    assert!(remaining.iter().any(|e| {
+        let name = e.file_name().to_string_lossy().into_owned();
+        name.starts_with("f_medium.") && name.ends_with(".bak.txt")
+    }));
     assert!(remaining.iter().any(|e| e.file_name().to_string_lossy().starts_with("D_MEDIUM.")));
 }
 
