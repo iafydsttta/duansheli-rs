@@ -357,6 +357,117 @@ fn test_log_file_created_on_run() {
     );
 }
 
+#[cfg(unix)]
+mod symlink_tests {
+    use super::*;
+    use std::os::unix::fs::symlink;
+
+    fn backdate_symlink(path: &std::path::Path, age_secs: u64) {
+        let new_mtime = SystemTime::now() - Duration::from_secs(age_secs);
+        let ft = filetime::FileTime::from_system_time(new_mtime);
+        filetime::set_symlink_file_times(path, ft, ft).unwrap();
+    }
+
+    #[test]
+    fn test_symlink_to_file_is_archived_as_link() {
+        let time_to_archive_hours: u64 = 1;
+        let time_to_deletion_hours: u64 = 999;
+        let exceeds_archive_secs = (time_to_archive_hours * 3600) + 1;
+
+        let outside = TempDir::new().unwrap();
+        let target = outside.path().join("real.txt");
+        fs::write(&target, "important contents").unwrap();
+
+        let tracked = TempDir::new().unwrap();
+        let root = tracked.path();
+        let link_path = root.join("link_to_file");
+        symlink(&target, &link_path).unwrap();
+        backdate_symlink(&link_path, exceeds_archive_secs);
+
+        let cfg = DirConfig {
+            path: root.to_path_buf(),
+            time_to_archive_hours,
+            time_to_deletion_hours,
+        };
+        declutter_directory(cfg, false).unwrap();
+
+        assert!(target.exists(), "target file must survive");
+        assert_eq!(fs::read_to_string(&target).unwrap(), "important contents");
+        assert!(
+            fs::symlink_metadata(&link_path).is_err(),
+            "link should be gone from tracked root"
+        );
+
+        let archive = root.join(".duansheli-archive");
+        let archived: Vec<_> = fs::read_dir(&archive)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        assert_eq!(archived.len(), 1, "archive should contain the moved link");
+        let entry = &archived[0];
+        let name = entry.file_name().to_string_lossy().into_owned();
+        assert!(name.starts_with("link_to_file."), "got name {name}");
+        let archived_ft = fs::symlink_metadata(entry.path()).unwrap().file_type();
+        assert!(
+            archived_ft.is_symlink(),
+            "archived entry must still be a symlink, not a copy"
+        );
+    }
+
+    #[test]
+    fn test_symlink_to_dir_is_archived_as_link() {
+        let time_to_archive_hours: u64 = 1;
+        let time_to_deletion_hours: u64 = 999;
+        let exceeds_archive_secs = (time_to_archive_hours * 3600) + 1;
+
+        let outside = TempDir::new().unwrap();
+        let target_dir = outside.path().join("real_dir");
+        fs::create_dir(&target_dir).unwrap();
+        let child = target_dir.join("child.txt");
+        fs::write(&child, "child contents").unwrap();
+
+        let tracked = TempDir::new().unwrap();
+        let root = tracked.path();
+        let link_path = root.join("link_to_dir");
+        symlink(&target_dir, &link_path).unwrap();
+        backdate_symlink(&link_path, exceeds_archive_secs);
+
+        let cfg = DirConfig {
+            path: root.to_path_buf(),
+            time_to_archive_hours,
+            time_to_deletion_hours,
+        };
+        declutter_directory(cfg, false).unwrap();
+
+        assert!(target_dir.exists(), "target dir must survive");
+        assert!(child.exists(), "child of target dir must survive");
+        assert_eq!(fs::read_to_string(&child).unwrap(), "child contents");
+        assert!(
+            fs::symlink_metadata(&link_path).is_err(),
+            "link should be gone from tracked root"
+        );
+
+        let archive = root.join(".duansheli-archive");
+        let archived: Vec<_> = fs::read_dir(&archive)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        assert_eq!(archived.len(), 1, "archive should contain only the moved link");
+        let entry = &archived[0];
+        let name = entry.file_name().to_string_lossy().into_owned();
+        assert!(name.starts_with("link_to_dir."), "got name {name}");
+        let archived_ft = fs::symlink_metadata(entry.path()).unwrap().file_type();
+        assert!(
+            archived_ft.is_symlink(),
+            "archived entry must still be a symlink"
+        );
+        assert!(
+            !archived_ft.is_dir(),
+            "archived entry must not be a real directory"
+        );
+    }
+}
+
 #[test]
 fn test_default_log_path_uses_home() {
     // Verify the public default_log_path() function returns a path rooted in HOME
