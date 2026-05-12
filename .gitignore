@@ -1,6 +1,7 @@
 .local/
 Claude.md
-fixtures/
-target/
-specs/
+/fixtures/
+/target/
+/specs/
 .vscode/
+/backlog/
