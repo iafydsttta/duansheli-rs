@@ -19,7 +19,7 @@ struct Cli {
     /// Increase log verbosity (-v info, -vv debug, -vvv trace)
     #[arg(short, long, action = clap::ArgAction::Count, global = true)]
     verbose: u8,
-    
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -80,7 +80,12 @@ fn init_logging(verbose: u8) -> Result<(), Box<dyn Error>> {
 
     let stderr_dispatch = fern::Dispatch::new()
         .format(|out, message, record| {
-            out.finish(format_args!("[{} {}] {}", record.level(), record.target(), message))
+            out.finish(format_args!(
+                "[{} {}] {}",
+                record.level(),
+                record.target(),
+                message
+            ))
         })
         .level(stderr_level(verbose))
         .chain(std::io::stderr());
@@ -97,7 +102,12 @@ fn init_logging(verbose: u8) -> Result<(), Box<dyn Error>> {
 fn init_stderr_only(verbose: u8) {
     let _ = fern::Dispatch::new()
         .format(|out, message, record| {
-            out.finish(format_args!("[{} {}] {}", record.level(), record.target(), message))
+            out.finish(format_args!(
+                "[{} {}] {}",
+                record.level(),
+                record.target(),
+                message
+            ))
         })
         .level(stderr_level(verbose))
         .chain(std::io::stderr())
@@ -135,8 +145,16 @@ impl fmt::Display for DuansheliConfig {
         writeln!(f, "  directories :")?;
         for dir in &self.dirs {
             writeln!(f, "    - {}", dir.path.display())?;
-            writeln!(f, "      archive after : {} hours", dir.time_to_archive_hours)?;
-            writeln!(f, "      delete after  : {} hours", dir.time_to_deletion_hours)?;
+            writeln!(
+                f,
+                "      archive after : {} hours",
+                dir.time_to_archive_hours
+            )?;
+            writeln!(
+                f,
+                "      delete after  : {} hours",
+                dir.time_to_deletion_hours
+            )?;
         }
         Ok(())
     }

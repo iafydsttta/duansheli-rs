@@ -87,26 +87,42 @@ fn test_directory_archival() {
     let archive = root.join(".duansheli-archive");
 
     // debug
-    debug_print_tree_with_timestamps(root);
+    // debug_print_tree_with_timestamps(root);
 
     let cfg = DirConfig {
         path: root.to_path_buf(),
         time_to_archive_hours,
         time_to_deletion_hours,
+        ignore_hidden_entries: true,
     };
 
     // act
     declutter_directory(cfg, false).unwrap();
 
     // assert — old entries moved to archive
-    assert!(!root.join("f_old.txt").exists(), "old file should be archived");
+    assert!(
+        !root.join("f_old.txt").exists(),
+        "old file should be archived"
+    );
     assert!(!root.join("D_OLD").exists(), "old dir should be archived");
-    assert!(!root.join("D_OLD_NESTING").exists(), "old nested dir should be archived");
-    assert!(!root.join("f_medium.txt").exists(), "medium file should be archived");
-    assert!(!root.join("D_MEDIUM").exists(), "medium dir should be archived");
+    assert!(
+        !root.join("D_OLD_NESTING").exists(),
+        "old nested dir should be archived"
+    );
+    assert!(
+        !root.join("f_medium.txt").exists(),
+        "medium file should be archived"
+    );
+    assert!(
+        !root.join("D_MEDIUM").exists(),
+        "medium dir should be archived"
+    );
 
     // young entries remain untouched
-    assert!(root.join("f_young.txt").exists(), "young file should remain");
+    assert!(
+        root.join("f_young.txt").exists(),
+        "young file should remain"
+    );
     assert!(root.join("D_YOUNG").exists(), "young dir should remain");
 
     // archive should contain all moved entries (with .bak suffix)
@@ -119,13 +135,25 @@ fn test_directory_archival() {
         let name = e.file_name().to_string_lossy().into_owned();
         name.starts_with("f_old.") && name.ends_with(".bak.txt")
     }));
-    assert!(archived.iter().any(|e| e.file_name().to_string_lossy().starts_with("D_OLD.")));
-    assert!(archived.iter().any(|e| e.file_name().to_string_lossy().starts_with("D_OLD_NESTING.")));
+    assert!(
+        archived
+            .iter()
+            .any(|e| e.file_name().to_string_lossy().starts_with("D_OLD."))
+    );
+    assert!(archived.iter().any(|e| {
+        e.file_name()
+            .to_string_lossy()
+            .starts_with("D_OLD_NESTING.")
+    }));
     assert!(archived.iter().any(|e| {
         let name = e.file_name().to_string_lossy().into_owned();
         name.starts_with("f_medium.") && name.ends_with(".bak.txt")
     }));
-    assert!(archived.iter().any(|e| e.file_name().to_string_lossy().starts_with("D_MEDIUM.")));
+    assert!(
+        archived
+            .iter()
+            .any(|e| e.file_name().to_string_lossy().starts_with("D_MEDIUM."))
+    );
 }
 
 #[test]
@@ -142,22 +170,44 @@ fn test_directory_archival_dry_run() {
         path: root.to_path_buf(),
         time_to_archive_hours,
         time_to_deletion_hours,
+        ignore_hidden_entries: true,
     };
 
     declutter_directory(cfg, true).unwrap();
 
     // all entries should remain in place
-    assert!(root.join("f_old.txt").exists(), "old file should still exist");
+    assert!(
+        root.join("f_old.txt").exists(),
+        "old file should still exist"
+    );
     assert!(root.join("D_OLD").exists(), "old dir should still exist");
-    assert!(root.join("D_OLD_NESTING").exists(), "old nested dir should still exist");
-    assert!(root.join("f_medium.txt").exists(), "medium file should still exist");
-    assert!(root.join("D_MEDIUM").exists(), "medium dir should still exist");
-    assert!(root.join("f_young.txt").exists(), "young file should still exist");
-    assert!(root.join("D_YOUNG").exists(), "young dir should still exist");
+    assert!(
+        root.join("D_OLD_NESTING").exists(),
+        "old nested dir should still exist"
+    );
+    assert!(
+        root.join("f_medium.txt").exists(),
+        "medium file should still exist"
+    );
+    assert!(
+        root.join("D_MEDIUM").exists(),
+        "medium dir should still exist"
+    );
+    assert!(
+        root.join("f_young.txt").exists(),
+        "young file should still exist"
+    );
+    assert!(
+        root.join("D_YOUNG").exists(),
+        "young dir should still exist"
+    );
 
     // archive exists but should be empty
     assert!(archive.is_dir(), "archive directory should exist");
-    let archived: Vec<_> = fs::read_dir(&archive).unwrap().filter_map(|e| e.ok()).collect();
+    let archived: Vec<_> = fs::read_dir(&archive)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
     assert_eq!(archived.len(), 0, "archive should be empty in dry-run");
 }
 
@@ -175,18 +225,37 @@ fn test_permanent_deletion_dry_run() {
         path: root.to_path_buf(),
         time_to_archive_hours,
         time_to_deletion_hours,
+        ignore_hidden_entries: true,
     };
 
     declutter_directory(cfg, true).unwrap();
 
     // all entries should remain in place
-    assert!(root.join("f_old.txt").exists(), "old file should still exist");
+    assert!(
+        root.join("f_old.txt").exists(),
+        "old file should still exist"
+    );
     assert!(root.join("D_OLD").exists(), "old dir should still exist");
-    assert!(root.join("D_OLD_NESTING").exists(), "old nested dir should still exist");
-    assert!(root.join("f_medium.txt").exists(), "medium file should still exist");
-    assert!(root.join("D_MEDIUM").exists(), "medium dir should still exist");
-    assert!(root.join("f_young.txt").exists(), "young file should still exist");
-    assert!(root.join("D_YOUNG").exists(), "young dir should still exist");
+    assert!(
+        root.join("D_OLD_NESTING").exists(),
+        "old nested dir should still exist"
+    );
+    assert!(
+        root.join("f_medium.txt").exists(),
+        "medium file should still exist"
+    );
+    assert!(
+        root.join("D_MEDIUM").exists(),
+        "medium dir should still exist"
+    );
+    assert!(
+        root.join("f_young.txt").exists(),
+        "young file should still exist"
+    );
+    assert!(
+        root.join("D_YOUNG").exists(),
+        "young dir should still exist"
+    );
 }
 
 #[test]
@@ -195,11 +264,16 @@ fn test_declutter_rejects_dangerous_path() {
         path: std::path::PathBuf::from("/"),
         time_to_archive_hours: 1,
         time_to_deletion_hours: 2,
+        ignore_hidden_entries: true,
     };
     let result = declutter_directory(cfg, true);
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("dangerous path"), "expected dangerous path error, got: {}", err_msg);
+    assert!(
+        err_msg.contains("dangerous path"),
+        "expected dangerous path error, got: {}",
+        err_msg
+    );
 }
 
 #[test]
@@ -221,16 +295,26 @@ fn test_ignored_files_survive_declutter() {
         path: root.to_path_buf(),
         time_to_archive_hours,
         time_to_deletion_hours,
+        ignore_hidden_entries: true,
     };
 
     declutter_directory(cfg, false).unwrap();
 
     // Metadata files should survive
-    assert!(root.join(".DS_Store").exists(), ".DS_Store should be ignored and survive");
-    assert!(root.join("Thumbs.db").exists(), "Thumbs.db should be ignored and survive");
+    assert!(
+        root.join(".DS_Store").exists(),
+        ".DS_Store should be ignored and survive"
+    );
+    assert!(
+        root.join("Thumbs.db").exists(),
+        "Thumbs.db should be ignored and survive"
+    );
 
     // Normal old file should be gone (deleted, since it exceeds deletion threshold)
-    assert!(!root.join("old_file.txt").exists(), "old_file.txt should have been deleted");
+    assert!(
+        !root.join("old_file.txt").exists(),
+        "old_file.txt should have been deleted"
+    );
 
     // Metadata files should NOT be in the archive
     let archive = root.join(".duansheli-archive");
@@ -241,8 +325,14 @@ fn test_ignored_files_survive_declutter() {
             .collect();
         for entry in &archived {
             let name = entry.file_name().to_string_lossy().to_string();
-            assert!(!name.starts_with(".DS_Store"), ".DS_Store should not be in archive");
-            assert!(!name.starts_with("Thumbs.db"), "Thumbs.db should not be in archive");
+            assert!(
+                !name.starts_with(".DS_Store"),
+                ".DS_Store should not be in archive"
+            );
+            assert!(
+                !name.starts_with("Thumbs.db"),
+                "Thumbs.db should not be in archive"
+            );
         }
     }
 }
@@ -269,26 +359,42 @@ fn test_permanent_deletion() {
     let archive = root.join(".duansheli-archive");
 
     // debug output
-    debug_print_tree_with_timestamps(root);
+    // debug_print_tree_with_timestamps(root);
 
     let cfg = DirConfig {
         path: root.to_path_buf(),
         time_to_archive_hours,
         time_to_deletion_hours,
+        ignore_hidden_entries: true,
     };
 
     // act
     declutter_directory(cfg, false).unwrap();
 
     // assert — all old and medium entries removed from root
-    assert!(!root.join("f_old.txt").exists(), "old file should leave root");
+    assert!(
+        !root.join("f_old.txt").exists(),
+        "old file should leave root"
+    );
     assert!(!root.join("D_OLD").exists(), "old dir should leave root");
-    assert!(!root.join("D_OLD_NESTING").exists(), "old nested dir should leave root");
-    assert!(!root.join("f_medium.txt").exists(), "medium file should leave root");
-    assert!(!root.join("D_MEDIUM").exists(), "medium dir should leave root");
+    assert!(
+        !root.join("D_OLD_NESTING").exists(),
+        "old nested dir should leave root"
+    );
+    assert!(
+        !root.join("f_medium.txt").exists(),
+        "medium file should leave root"
+    );
+    assert!(
+        !root.join("D_MEDIUM").exists(),
+        "medium dir should leave root"
+    );
 
     // young entries untouched
-    assert!(root.join("f_young.txt").exists(), "young file should remain");
+    assert!(
+        root.join("f_young.txt").exists(),
+        "young file should remain"
+    );
     assert!(root.join("D_YOUNG").exists(), "young dir should remain");
 
     // archive: medium entries survive, old entries permanently deleted
@@ -307,7 +413,11 @@ fn test_permanent_deletion() {
         let name = e.file_name().to_string_lossy().into_owned();
         name.starts_with("f_medium.") && name.ends_with(".bak.txt")
     }));
-    assert!(remaining.iter().any(|e| e.file_name().to_string_lossy().starts_with("D_MEDIUM.")));
+    assert!(
+        remaining
+            .iter()
+            .any(|e| e.file_name().to_string_lossy().starts_with("D_MEDIUM."))
+    );
 }
 
 /// Run the duansheli binary as a subprocess, pointing HOME to a temp dir so the
@@ -346,13 +456,19 @@ fn test_log_file_created_on_run() {
 
     // The binary will exit with an error (no config file), but the log file
     // should still exist with content from the logging initialization
-    assert!(expected_log.exists(), "log file should be created at {}", expected_log.display());
+    assert!(
+        expected_log.exists(),
+        "log file should be created at {}",
+        expected_log.display()
+    );
 
     let log_content = fs::read_to_string(&expected_log).unwrap();
     assert!(!log_content.is_empty(), "log file should not be empty");
     // The error about the missing config file should be logged
     assert!(
-        log_content.contains("ERROR") || log_content.contains("WARN") || log_content.contains("DEBUG"),
+        log_content.contains("ERROR")
+            || log_content.contains("WARN")
+            || log_content.contains("DEBUG"),
         "log file should contain log level markers, got: {log_content}"
     );
 }
@@ -388,6 +504,7 @@ mod symlink_tests {
             path: root.to_path_buf(),
             time_to_archive_hours,
             time_to_deletion_hours,
+            ignore_hidden_entries: true,
         };
         declutter_directory(cfg, false).unwrap();
 
@@ -436,6 +553,7 @@ mod symlink_tests {
             path: root.to_path_buf(),
             time_to_archive_hours,
             time_to_deletion_hours,
+            ignore_hidden_entries: true,
         };
         declutter_directory(cfg, false).unwrap();
 
@@ -452,7 +570,11 @@ mod symlink_tests {
             .unwrap()
             .filter_map(|e| e.ok())
             .collect();
-        assert_eq!(archived.len(), 1, "archive should contain only the moved link");
+        assert_eq!(
+            archived.len(),
+            1,
+            "archive should contain only the moved link"
+        );
         let entry = &archived[0];
         let name = entry.file_name().to_string_lossy().into_owned();
         assert!(name.starts_with("link_to_dir."), "got name {name}");
@@ -465,6 +587,146 @@ mod symlink_tests {
             !archived_ft.is_dir(),
             "archived entry must not be a real directory"
         );
+    }
+}
+
+mod special_name_tests {
+    use std::result;
+
+    use super::*;
+
+    /// Outcome of a single archive pass over a freshly-built temp dir.
+    #[allow(dead_code)]
+    struct ArchivePass {
+        /// File names found in the archive afterwards (`.bak`-suffixed).
+        archived: Vec<String>,
+        /// File names still present in the tracked root (archive dir excluded).
+        remaining_in_root: Vec<String>,
+    }
+
+    /// Build a temp dir holding one old entry per `names`, run an archive-only
+    /// declutter pass, and report what landed in the archive vs. stayed in root.
+    ///
+    /// `time_to_deletion_hours` is set high so nothing is ever deleted — every
+    /// aged entry should be *archived*, which is what these tests assert on.
+    /// `ignore_hidden_entries` is threaded through so the hidden-file test can
+    /// exercise both settings.
+    #[allow(dead_code)]
+    fn run_archive_pass(names: &[&str], ignore_hidden_entries: bool) -> ArchivePass {
+        let time_to_archive_hours: u64 = 1;
+        let time_to_deletion_hours: u64 = 999;
+        let exceeds_archive_secs = (time_to_archive_hours * 3600) + 1;
+
+        let tmp_dir = TempDir::new().unwrap();
+        let root = tmp_dir.path();
+        for name in names {
+            create_file_fixture(root, name, exceeds_archive_secs);
+        }
+
+        let cfg = DirConfig {
+            path: root.to_path_buf(),
+            time_to_archive_hours,
+            time_to_deletion_hours,
+            ignore_hidden_entries,
+        };
+        declutter_directory(cfg, false).unwrap();
+
+        let names_in = |dir: &std::path::Path| -> Vec<String> {
+            if !dir.exists() {
+                return Vec::new();
+            }
+            fs::read_dir(dir)
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .filter(|n| n != ".duansheli-archive")
+                .collect()
+        };
+
+        ArchivePass {
+            archived: names_in(&root.join(".duansheli-archive")),
+            remaining_in_root: names_in(root),
+        }
+    }
+
+    /// Assert the archive holds an entry whose name derives from `original`
+    /// (the planner inserts a `.<timestamp>.bak` infix, so we match the stem).
+    #[allow(dead_code)]
+    fn assert_archived(pass: &ArchivePass, original: &str) {
+        let stem = std::path::Path::new(original)
+            .file_stem()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let prefix = format!("{stem}.");
+        assert!(
+            pass.archived.iter().any(|n| n.starts_with(&prefix)),
+            "expected an archived entry for {original:?} (prefix {prefix:?}), \
+             archive contained: {:?}",
+            pass.archived
+        );
+    }
+
+    fn assert_not_archived(pass: &ArchivePass, original: &str) {
+        let stem = std::path::Path::new(&original)
+            .file_stem()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+
+        let prefix = format!("{stem}.");
+
+        assert!(
+            !pass.archived.iter().any(|n| n.starts_with(&prefix)),
+            "expected no archived entry for {original:?} (prefix {prefix:?}), \
+             archive contained: {:?}",
+            pass.archived
+        )
+    }
+
+    #[test]
+    fn unicode_names_are_archived() {
+        // café.txt, 日本語.txt, 🚀.bin — NFC/NFD round-trip via the FS.
+    }
+
+    #[test]
+    fn spaces_and_shell_metacharacters_are_archived() {
+        // "my file.txt", "weird$name", literal "*.tmp", single/double quotes.
+    }
+
+    #[test]
+    fn hidden_entries_are_archived_via_config() {
+        let result = run_archive_pass(&[".foo", "bar"], false);
+        assert_archived(&result, ".foo");
+    }
+
+    #[test]
+    fn hidden_entries_ignored_via_config() {
+        let result = run_archive_pass(&[".foo", "bar"], true);
+        assert_not_archived(&result, ".foo");
+    }
+
+    #[test]
+    fn control_characters_in_names_do_not_break_logging() {
+        // "a\nb", "a\tb" — must not corrupt log output or assertions.
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trailing_dots_and_spaces_are_archived() {
+        // "name.", "name " — legal on Unix, illegal on Windows.
+    }
+
+    #[test]
+    fn very_long_names_are_archived() {
+        // Near NAME_MAX (255 bytes). Multi-byte chars consume the budget.
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_names_do_not_panic() {
+        // "\xFF" in the filename — Unix only (Windows is WTF-16).
+        // Today path.to_str().unwrap() panics; this test pins the contract.
     }
 }
 

@@ -108,6 +108,13 @@ pub struct DirConfig {
     pub path: PathBuf,
     pub time_to_archive_hours: u64,
     pub time_to_deletion_hours: u64,
+
+    #[serde(default = "default_ignore_hidden")]
+    pub ignore_hidden_entries: bool,
+}
+
+fn default_ignore_hidden() -> bool {
+    true
 }
 
 #[derive(Debug, PartialEq)]
