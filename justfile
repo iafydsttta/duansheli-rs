@@ -1,4 +1,13 @@
 # Run the application with default config
+
+# Note to self - Just syntax
+# @             Do not print command that is executed
+# -             Ignore errors on that line (continue even if it exits non-zero).
+# @- / -@       Combine both (silent and error-tolerant).
+
+default:
+    @just --list
+
 run:
     cargo run -- run -v
     
