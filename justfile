@@ -1,11 +1,12 @@
 # Run the application with default config
 
-# Note to self - Just syntax
+# Note to self: Just syntax
 # @             Do not print command that is executed
 # -             Ignore errors on that line (continue even if it exits non-zero).
 # @- / -@       Combine both (silent and error-tolerant).
 
-default:
+# Print list of just commands
+list:
     @just --list
 
 run:
@@ -27,7 +28,7 @@ build:
 # Run tests
 test:
     cargo test -- --nocapture
-    
+
 # Run tests (warnings muted)
 test-quiet $RUSTFLAGS="-A warnings":
      cargo test -- --nocapture
@@ -39,3 +40,8 @@ release:
 # Clean build artifacts
 clean:
     cargo clean
+
+# List gitignored files
+list-ignored:
+    git ls-files --others --ignored --exclude-standard | grep -v target
+
