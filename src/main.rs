@@ -142,20 +142,32 @@ struct DuansheliConfig {
 
 impl fmt::Display for DuansheliConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // hardcoded to current longest option length
+        const LABEL_W: usize = 21;
+
         writeln!(f, "  directories :")?;
+
         for dir in &self.dirs {
             writeln!(f, "    - {}", dir.path.display())?;
             writeln!(
                 f,
-                "      archive after : {} hours",
-                dir.time_to_archive_hours
+                "      {:<LABEL_W$} : {} hours",
+                "archive after", dir.time_to_archive_hours
             )?;
+
             writeln!(
                 f,
-                "      delete after  : {} hours",
-                dir.time_to_deletion_hours
+                "      {:<LABEL_W$} : {} hours",
+                "delete after", dir.time_to_deletion_hours
+            )?;
+
+            writeln!(
+                f,
+                "      {:<LABEL_W$} : {}",
+                "ignore hidden entries", dir.ignore_hidden_entries
             )?;
         }
+
         Ok(())
     }
 }
