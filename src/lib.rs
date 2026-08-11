@@ -4,7 +4,7 @@ use std::env;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
-use std::fs::{create_dir_all, remove_dir_all, remove_file, rename};
+use std::fs::{DirEntry, create_dir_all, remove_dir_all, remove_file, rename};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -209,7 +209,8 @@ pub fn plan_declutter(cfg: &DirConfig) -> Result<Vec<FileAction>, Box<dyn Error>
     let archive_cutoff = cfg.time_to_archive_hours * 3600;
     let delete_cutoff = cfg.time_to_deletion_hours * 3600;
 
-    let root_entries = list_dir_with_meta(&cfg.path, Some(archive_name))?;
+    let root_entries =
+        list_dir_with_meta(&cfg.path, Some(archive_name), cfg.ignore_hidden_entries)?;
 
     let (to_delete, to_archive): (Vec<_>, Vec<_>) = root_entries
         .into_iter()
@@ -224,7 +225,7 @@ pub fn plan_declutter(cfg: &DirConfig) -> Result<Vec<FileAction>, Box<dyn Error>
     ));
 
     // Delete existing archive entries that exceed deletion cutoff
-    let archive_entries = list_dir_with_meta(&archive_path, None)?;
+    let archive_entries = list_dir_with_meta(&archive_path, None, false)?;
     actions.extend(plan_delete_actions(archive_entries, delete_cutoff));
 
     Ok(actions)
@@ -269,9 +270,14 @@ pub fn declutter_directory(cfg: DirConfig, dry_run: bool) -> Result<(), Box<dyn 
     Ok(())
 }
 
+fn is_hidden_entry(entry: &DirEntry) -> bool {
+    entry.file_name().as_encoded_bytes().starts_with(b".")
+}
+
 pub fn list_dir_with_meta(
     dir: &Path,
     exclude_recursive: Option<&str>,
+    exclude_hidden: bool,
 ) -> Result<Vec<DirEntryWithAge>, Box<dyn Error>> {
     if !dir.is_dir() {
         let err = Err("Directory does not exist".into());
@@ -287,6 +293,11 @@ pub fn list_dir_with_meta(
 
             if exclude_recursive.is_some_and(|x| x == entry.file_name()) {
                 log::debug!("Excluding: {:?}", entry.path());
+                return None;
+            }
+
+            if exclude_hidden && is_hidden_entry(&entry) {
+                log::debug!("Ignoring hidden entry: {:?}", entry.path());
                 return None;
             }
 
