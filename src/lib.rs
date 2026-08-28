@@ -270,8 +270,29 @@ pub fn declutter_directory(cfg: DirConfig, dry_run: bool) -> Result<(), Box<dyn 
     Ok(())
 }
 
-fn is_hidden_entry(entry: &DirEntry) -> bool {
+fn has_dot_prefix(entry: &DirEntry) -> bool {
     entry.file_name().as_encoded_bytes().starts_with(b".")
+}
+
+#[cfg(unix)]
+fn is_hidden_entry(entry: &DirEntry) -> bool {
+    has_dot_prefix(entry)
+}
+
+#[cfg(windows)]
+fn is_hidden_entry(entry: &DirEntry) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+
+    // also catch unix-style dot prefix
+    if has_dot_prefix(entry) {
+        return true;
+    }
+
+    entry
+        .metadata()
+        .map(|m| m.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0)
+        .unwrap_or(false)
 }
 
 pub fn list_dir_with_meta(
