@@ -45,8 +45,7 @@ clean:
 list-ignored:
     git ls-files --others --ignored --exclude-standard | grep -v target
 
-# Check the Windows-only #[cfg] arms
+# Check the Windows-only #[cfg] arms (target std comes from the nix dev shell)
 check-windows:
-   rustup target add x86_64-pc-windows-msvc
    cargo check --target x86_64-pc-windows-msvc  --all-targets
 

@@ -77,6 +77,8 @@
                 "clippy"
                 "rustfmt"
               ];
+              # Std lib for `just check-windows` (check only; no linker needed)
+              targets = [ "x86_64-pc-windows-msvc" ];
             })
             # pkgs.cargo-nextest
             # pkgs.cargo-watch
